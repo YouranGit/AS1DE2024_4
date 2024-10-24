@@ -3,7 +3,6 @@ from flask import jsonify
 import json
 import pandas as pd
 from io import StringIO
-
 class HousePredictor:
     def __init__(self):
         self.model = None
