@@ -3,4 +3,4 @@ flask
 requests
 joblib
 scikit-learn
-sklearn
+pickle

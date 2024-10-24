@@ -8,4 +8,4 @@ h5py
 six
 joblib
 scikit-learn
-sklearn
+pickle
