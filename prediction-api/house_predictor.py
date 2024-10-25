@@ -20,7 +20,7 @@ class HousePredictor:
             client = storage.Client(project=project_id)
             bucket = client.bucket(model_repo)
             blob = bucket.blob("model.pkl")
-            blob.download_to_filename('random_forest_model.h5')
+            blob.download_to_filename('random_forest_model.pkl')
             self.model = joblib.load("random_forest_model.pkl")
 
         if isinstance(prediction_input, dict):
