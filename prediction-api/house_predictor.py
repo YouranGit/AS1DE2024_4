@@ -15,10 +15,8 @@ class HousePredictor:
             # Load the .pkl model using pickle (for scikit-learn model)
             # with open("random_forest_model.pkl", "rb") as f:
             #     self.model = pickle.load(f)
-            project_id = os.environ.get('PROJECT_ID', 'Specified environment variable is not set.')
-            model_repo = os.environ.get('MODEL_REPO', 'Specified environment variable is not set.')
-            client = storage.Client(project=project_id)
-            bucket = client.bucket(model_repo)
+            client = storage.Client("spatial-path-435110-f1")
+            bucket = client.bucket("models_as1de2024_3")
             blob = bucket.blob("model.pkl")
             blob.download_to_filename('random_forest_model.pkl')
             self.model = joblib.load("random_forest_model.pkl")
