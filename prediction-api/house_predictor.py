@@ -3,6 +3,9 @@ from flask import jsonify
 import json
 import pandas as pd
 from io import StringIO
+from google.cloud import storage
+import os
+import json
 class HousePredictor:
     def __init__(self):
         self.model = None
@@ -12,6 +15,12 @@ class HousePredictor:
             # Load the .pkl model using pickle (for scikit-learn model)
             # with open("random_forest_model.pkl", "rb") as f:
             #     self.model = pickle.load(f)
+            project_id = os.environ.get('PROJECT_ID', 'Specified environment variable is not set.')
+            model_repo = os.environ.get('MODEL_REPO', 'Specified environment variable is not set.')
+            client = storage.Client(project=project_id)
+            bucket = client.bucket(model_repo)
+            blob = bucket.blob("model.pkl")
+            blob.download_to_filename('random_forest_model.h5')
             self.model = joblib.load("random_forest_model.pkl")
 
         if isinstance(prediction_input, dict):
