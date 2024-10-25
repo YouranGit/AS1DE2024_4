@@ -3,51 +3,178 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Predict California Housing Price</title>
+    <title>CaliHome | Predict California Housing Price</title>
+    <style>
+        /* Reset margin and padding */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Background styling */
+        body {
+            font-family: Arial, sans-serif;
+            background-image: url('https://images.unsplash.com/photo-1560185127-6a8c4d169bb8');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            color: #333;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* Main container */
+        .container {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 2rem;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            text-align: center; /* Center container content */
+            margin-top: 20px;
+        }
+
+        /* Header */
+        .logo {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2a9d8f;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: #264653;
+            margin-bottom: 1rem;
+        }
+
+        /* Form styling */
+        form {
+            text-align: left; /* Aligns form elements to the left */
+            display: inline-block; /* Keeps form centered but aligns inputs to the left */
+            width: 100%;
+        }
+
+        .form-group {
+            max-width: 400px; /* Set maximum width */
+            margin-bottom: 1rem;
+        }
+
+        form label {
+            display: block;
+            font-weight: bold;
+            color: #264653;
+            margin-bottom: 0.3rem;
+        }
+
+        form input[type="text"] {
+            width: 30%;
+            padding: 0.2rem;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            background-color: #f7f7f7;
+        }
+
+        /* Submit button styling */
+        form input[type="submit"] {
+            width: 100%;
+            padding: 0.6rem;
+            margin-top: 1rem;
+            background-color: #2a9d8f;
+            color: white;
+            font-size: 1rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        form input[type="submit"]:hover {
+            background-color: #21867a;
+        }
+    </style>
 </head>
 <body>
-    <h1>Enter Features to Predict Housing Price</h1>
-    <form action="/checkprice" method="post">
-        <label for="feature_1">Median Income:</label>
-        <input type="text" name="feature_1" required><br>
+    <div class="container">
+        <div class="logo">CaliHome</div>
+        <h1>Predict California Housing Price</h1>
+        <p>Enter property details to estimate the house price in California's hottest markets.</p>
+        
+        <form action="/checkprice" method="post">
+            <div class="form-group">
+                <label for="feature_1">Median Income:</label>
+                <input type="text" name="feature_1" required>
+            </div>
 
-        <label for="feature_2">Median Age:</label>
-        <input type="text" name="feature_2" required><br>
+            <div class="form-group">
+                <label for="feature_2">Median Age:</label>
+                <input type="text" name="feature_2" required>
+            </div>
 
-        <label for="feature_3">Total Rooms:</label>
-        <input type="text" name="feature_3" required><br>
+            <div class="form-group">
+                <label for="feature_3">Total Rooms:</label>
+                <input type="text" name="feature_3" required>
+            </div>
 
-        <label for="feature_4">Total Bedrooms:</label>
-        <input type="text" name="feature_4" required><br>
+            <div class="form-group">
+                <label for="feature_4">Total Bedrooms:</label>
+                <input type="text" name="feature_4" required>
+            </div>
 
-        <label for="feature_5">Population:</label>
-        <input type="text" name="feature_5" required><br>
+            <div class="form-group">
+                <label for="feature_5">Population:</label>
+                <input type="text" name="feature_5" required>
+            </div>
 
-        <label for="feature_6">Households:</label>
-        <input type="text" name="feature_6" required><br>
+            <div class="form-group">
+                <label for="feature_6">Households:</label>
+                <input type="text" name="feature_6" required>
+            </div>
 
-        <label for="feature_7">Latitude:</label>
-        <input type="text" name="feature_7" required><br>
+            <div class="form-group">
+                <label for="feature_7">Latitude:</label>
+                <input type="text" name="feature_7" required>
+            </div>
 
-        <label for="feature_8">Longitude:</label>
-        <input type="text" name="feature_8" required><br>
+            <div class="form-group">
+                <label for="feature_8">Longitude:</label>
+                <input type="text" name="feature_8" required>
+            </div>
 
-        <label for="feature_9">Distance to Coast:</label>
-        <input type="text" name="feature_9" required><br>
+            <div class="form-group">
+                <label for="feature_9">Distance to Coast:</label>
+                <input type="text" name="feature_9" required>
+            </div>
 
-        <label for="feature_10">Distance to LA:</label>
-        <input type="text" name="feature_10" required><br>
+            <div class="form-group">
+                <label for="feature_10">Distance to LA:</label>
+                <input type="text" name="feature_10" required>
+            </div>
 
-        <label for="feature_11">Distance to San Diego:</label>
-        <input type="text" name="feature_11" required><br>
+            <div class="form-group">
+                <label for="feature_11">Distance to San Diego:</label>
+                <input type="text" name="feature_11" required>
+            </div>
 
-        <label for="feature_12">Distance to San Jose:</label>
-        <input type="text" name="feature_12" required><br>
+            <div class="form-group">
+                <label for="feature_12">Distance to San Jose:</label>
+                <input type="text" name="feature_12" required>
+            </div>
 
-        <label for="feature_13">Distance to San Francisco:</label>
-        <input type="text" name="feature_13" required><br>
+            <div class="form-group">
+                <label for="feature_13">Distance to San Francisco:</label>
+                <input type="text" name="feature_13" required>
+            </div>
 
-        <input type="submit" value="Predict">
-    </form>
+            <input type="submit" value="Predict">
+        </form>
+    </div>
 </body>
 </html>
