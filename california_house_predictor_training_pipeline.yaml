@@ -227,7 +227,7 @@ deploymentSpec:
           \ Input[Model],\n) -> NamedTuple('outputs', approval=bool):\n\n    import\
           \ pandas as pd\n    import logging     \n    import json\n    import typing\n\
           \    import pickle\n    from sklearn.metrics import r2_score\n\n    def\
-          \ threshold_check(val1):\n        cond = False\n        if val1 >= 0.3 :\n\
+          \ threshold_check(val1):\n        cond = False\n        if val1 >= 0.5 :\n\
           \            cond = True\n        return cond\n\n    data = pd.read_csv(test_set.path+\"\
           .csv\")\n\n     #Loading the saved model with joblib\n    m_filename = rf_model.path\
           \ + \".pkl\"\n    model = pickle.load(open(m_filename, 'rb'))\n\n    x_test\
