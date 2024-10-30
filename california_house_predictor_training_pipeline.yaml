@@ -1,0 +1,510 @@
+# PIPELINE DEFINITION
+# Name: california-houses-predictor-training-pipeline
+# Inputs:
+#    data_bucket: str
+#    dataset_uri: str
+#    model_repo: str
+#    model_repo_uri: str
+#    project_id: str
+#    trigger_id: str
+components:
+  comp-condition-1:
+    dag:
+      tasks:
+        run-build-trigger:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-run-build-trigger
+          dependentTasks:
+          - upload-model-to-gcs
+          inputs:
+            parameters:
+              project_id:
+                componentInputParameter: pipelinechannel--project_id
+              trigger_id:
+                componentInputParameter: pipelinechannel--trigger_id
+          taskInfo:
+            name: run-build-trigger
+        upload-model-to-gcs:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-upload-model-to-gcs
+          inputs:
+            artifacts:
+              model:
+                componentInputArtifact: pipelinechannel--train-forest-model
+            parameters:
+              model_repo:
+                componentInputParameter: pipelinechannel--model_repo
+              project_id:
+                componentInputParameter: pipelinechannel--project_id
+          taskInfo:
+            name: upload-model-to-gcs
+    inputDefinitions:
+      artifacts:
+        pipelinechannel--train-forest-model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        pipelinechannel--model_repo:
+          parameterType: STRING
+        pipelinechannel--project_id:
+          parameterType: STRING
+        pipelinechannel--rf-model-evaluation-approval:
+          parameterType: BOOLEAN
+        pipelinechannel--trigger_id:
+          parameterType: STRING
+  comp-importer:
+    executorLabel: exec-importer
+    inputDefinitions:
+      parameters:
+        uri:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        artifact:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-remove-outliers:
+    executorLabel: exec-remove-outliers
+    inputDefinitions:
+      artifacts:
+        dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        df_cleaned:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-rf-model-evaluation:
+    executorLabel: exec-rf-model-evaluation
+    inputDefinitions:
+      artifacts:
+        rf_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+        test_set:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      parameters:
+        approval:
+          parameterType: BOOLEAN
+  comp-run-build-trigger:
+    executorLabel: exec-run-build-trigger
+    inputDefinitions:
+      parameters:
+        project_id:
+          parameterType: STRING
+        trigger_id:
+          parameterType: STRING
+  comp-train-forest:
+    executorLabel: exec-train-forest
+    inputDefinitions:
+      artifacts:
+        features:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+  comp-train-test-split:
+    executorLabel: exec-train-test-split
+    inputDefinitions:
+      artifacts:
+        clean_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        dataset_test:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        dataset_train:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-upload-model-to-gcs:
+    executorLabel: exec-upload-model-to-gcs
+    inputDefinitions:
+      artifacts:
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        model_repo:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-importer:
+      importer:
+        artifactUri:
+          runtimeParameter: uri
+        typeSchema:
+          schemaTitle: system.Dataset
+          schemaVersion: 0.0.1
+    exec-remove-outliers:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - remove_outliers
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pandas' 'scikit-learn==1.3.2'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef remove_outliers(dataset: Input[Dataset], df_cleaned: Output[Dataset]):\n\
+          \    \"\"\"Remove outliers using the IQR method.\"\"\"\n    import pandas\
+          \ as pd\n\n    df = pd.read_csv(dataset.path, index_col=None)\n    Q1 =\
+          \ df.quantile(0.25)\n    Q3 = df.quantile(0.75)\n    IQR = Q3 - Q1\n   \
+          \ lower_bound = Q1 - 1.5 * IQR\n    upper_bound = Q3 + 1.5 * IQR\n    df_clean\
+          \ = df[~((df < lower_bound) | (df > upper_bound)).any(axis=1)]\n    df_clean.to_csv(df_cleaned.path\
+          \ + \".csv\", index=False, encoding='utf-8-sig')\n\n"
+        image: python:3.10.7-slim
+    exec-rf-model-evaluation:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - rf_model_evaluation
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pandas' 'scikit-learn==1.3.2'\
+          \ 'numpy' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef rf_model_evaluation(\n    test_set:  Input[Dataset],\n    rf_model:\
+          \ Input[Model],\n) -> NamedTuple('outputs', approval=bool):\n\n    import\
+          \ pandas as pd\n    import logging     \n    import json\n    import typing\n\
+          \    import pickle\n    from sklearn.metrics import r2_score\n\n    def\
+          \ threshold_check(val1):\n        cond = False\n        if val1 >= 0.3 :\n\
+          \            cond = True\n        return cond\n\n    data = pd.read_csv(test_set.path+\"\
+          .csv\")\n\n     #Loading the saved model with joblib\n    m_filename = rf_model.path\
+          \ + \".pkl\"\n    model = pickle.load(open(m_filename, 'rb'))\n\n    x_test\
+          \ = data.drop(columns=[\"Median_House_Value\"])\n    y_target = data['Median_House_Value']\n\
+          \    y_pred = model.predict(x_test)    \n\n\n    outputs = NamedTuple('outputs',\
+          \ approval=bool)\n    r2 = r2_score(y_target, y_pred)\n    pipeline_check\
+          \ = threshold_check(float(r2))\n    return outputs(pipeline_check)\n\n"
+        image: python:3.10.7-slim
+    exec-run-build-trigger:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - run_build_trigger
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-build'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef run_build_trigger(project_id:str, trigger_id:str):\n    import\
+          \ sys\n    from google.cloud.devtools import cloudbuild_v1    \n    import\
+          \ logging \n    logging.basicConfig(stream=sys.stdout, level=logging.INFO)\
+          \ \n\n    # Create a client\n    client = cloudbuild_v1.CloudBuildClient()\n\
+          \    name = f\"projects/{project_id}/locations/us-central1/triggers/{trigger_id}\"\
+          \n    # Initialize request argument(s)\n    request = cloudbuild_v1.RunBuildTriggerRequest(\
+          \        \n        project_id=project_id,\n        trigger_id=trigger_id,\n\
+          \        name=name\n    )\n\n    # Make the request\n    operation = client.run_build_trigger(request=request)\n\
+          \n    logging.info(\"Trigger the CI-CD Pipeline: \" + trigger_id)\n\n"
+        image: python:3.10.7-slim
+    exec-train-forest:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_forest
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pandas' 'scikit-learn==1.3.2'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_forest(features: Input[Dataset], model: Output[Model]):\n\
+          \    '''train a RandomForestModel with default parameters'''\n    import\
+          \ pandas as pd\n    from sklearn.ensemble import RandomForestRegressor\n\
+          \    import pickle \n\n\n    data = pd.read_csv(features.path+\".csv\")\n\
+          \    rf_model = RandomForestRegressor(n_estimators=100, random_state=42)\n\
+          \    rf_model.fit(data.drop('Median_House_Value',axis=1), data['Median_House_Value'])\n\
+          \   # model.metadata[\"framework\"] = \"LR\"\n    file_name = model.path\
+          \ + f\".pkl\"\n    with open(file_name, 'wb') as file:  \n        pickle.dump(rf_model,\
+          \ file)   \n\n"
+        image: python:3.10.7-slim
+    exec-train-test-split:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_test_split
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pandas' 'scikit-learn==1.3.2'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_test_split(clean_dataset: Input[Dataset], dataset_train:\
+          \ Output[Dataset], dataset_test: Output[Dataset]):\n    '''train_test_split'''\n\
+          \    import pandas as pd\n    import logging \n    import sys\n    from\
+          \ sklearn.model_selection import train_test_split as tts\n\n    logging.basicConfig(stream=sys.stdout,\
+          \ level=logging.INFO) \n\n    alldata = pd.read_csv(clean_dataset.path+\"\
+          .csv\", index_col=None)\n    train, test = tts(alldata, test_size=0.2)\n\
+          \    train.to_csv(dataset_train.path + \".csv\" , index=False, encoding='utf-8-sig')\n\
+          \    test.to_csv(dataset_test.path + \".csv\" , index=False, encoding='utf-8-sig')\n\
+          \n"
+        image: python:3.10.7-slim
+    exec-upload-model-to-gcs:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - upload_model_to_gcs
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-storage'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef upload_model_to_gcs(project_id: str, model_repo: str, model:\
+          \ Input[Model]):\n    '''upload model to gsc'''\n    from google.cloud import\
+          \ storage   \n    import logging \n    import sys\n\n    logging.basicConfig(stream=sys.stdout,\
+          \ level=logging.INFO)    \n\n    # upload the model to GCS\n    client =\
+          \ storage.Client(project=project_id)\n    bucket = client.bucket(model_repo)\n\
+          \    blob = bucket.blob('model.pkl')\n    source_file_name= model.path +\
+          \ '.pkl'\n\n    blob.upload_from_filename(source_file_name)    \n\n    print(f\"\
+          File {source_file_name} uploaded to {model_repo}.\")\n\n"
+        image: python:3.10.7-slim
+pipelineInfo:
+  name: california-houses-predictor-training-pipeline
+root:
+  dag:
+    tasks:
+      condition-1:
+        componentRef:
+          name: comp-condition-1
+        dependentTasks:
+        - rf-model-evaluation
+        - train-forest
+        inputs:
+          artifacts:
+            pipelinechannel--train-forest-model:
+              taskOutputArtifact:
+                outputArtifactKey: model
+                producerTask: train-forest
+          parameters:
+            pipelinechannel--model_repo:
+              componentInputParameter: model_repo
+            pipelinechannel--project_id:
+              componentInputParameter: project_id
+            pipelinechannel--rf-model-evaluation-approval:
+              taskOutputParameter:
+                outputParameterKey: approval
+                producerTask: rf-model-evaluation
+            pipelinechannel--trigger_id:
+              componentInputParameter: trigger_id
+        taskInfo:
+          name: approve-model
+        triggerPolicy:
+          condition: inputs.parameter_values['pipelinechannel--rf-model-evaluation-approval']
+            == true
+      importer:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-importer
+        inputs:
+          parameters:
+            uri:
+              componentInputParameter: dataset_uri
+        taskInfo:
+          name: importer
+      remove-outliers:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-remove-outliers
+        dependentTasks:
+        - importer
+        inputs:
+          artifacts:
+            dataset:
+              taskOutputArtifact:
+                outputArtifactKey: artifact
+                producerTask: importer
+        taskInfo:
+          name: remove-outliers
+      rf-model-evaluation:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-rf-model-evaluation
+        dependentTasks:
+        - train-forest
+        - train-test-split
+        inputs:
+          artifacts:
+            rf_model:
+              taskOutputArtifact:
+                outputArtifactKey: model
+                producerTask: train-forest
+            test_set:
+              taskOutputArtifact:
+                outputArtifactKey: dataset_test
+                producerTask: train-test-split
+        taskInfo:
+          name: rf-model-evaluation
+      train-forest:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-forest
+        dependentTasks:
+        - train-test-split
+        inputs:
+          artifacts:
+            features:
+              taskOutputArtifact:
+                outputArtifactKey: dataset_train
+                producerTask: train-test-split
+        taskInfo:
+          name: train-forest
+      train-test-split:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-test-split
+        dependentTasks:
+        - remove-outliers
+        inputs:
+          artifacts:
+            clean_dataset:
+              taskOutputArtifact:
+                outputArtifactKey: df_cleaned
+                producerTask: remove-outliers
+        taskInfo:
+          name: train-test-split
+  inputDefinitions:
+    parameters:
+      data_bucket:
+        parameterType: STRING
+      dataset_uri:
+        parameterType: STRING
+      model_repo:
+        parameterType: STRING
+      model_repo_uri:
+        parameterType: STRING
+      project_id:
+        parameterType: STRING
+      trigger_id:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.7.0
