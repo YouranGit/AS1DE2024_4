@@ -1,5 +1,6 @@
 {
   "project_id": "spatial-path-435110-f1",
   "data_bucket": "data_as1de2024_3",
+  "trainset_filename": "California_Houses.csv",
   "model_repo": "models_as1de2024_3"
 }
