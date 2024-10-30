@@ -1,7 +1,7 @@
 {
  "steps": [
     {
-      "name": "gcr.io/cloud-builders/dockers",
+      "name": "gcr.io/cloud-builders/docker",
       "args": [
         "build",
         "-t",
@@ -10,7 +10,7 @@
       ]
     },
     {
-      "name": "gcr.io/cloud-builders/dockers",
+      "name": "gcr.io/cloud-builders/docker",
       "args": [
         "push",
         "${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/pipeline-executor:0.0.1"
